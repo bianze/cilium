@@ -361,28 +361,6 @@ handle_to_netdev_ipv6(struct __ctx_buff *ctx)
 #endif /* ENABLE_IPV6 */
 
 #ifdef ENABLE_IPV4
-# ifdef ENABLE_HOST_FIREWALL
-static __always_inline __u32
-ipcache_lookup_srcid4(struct __ctx_buff *ctx)
-{
-	struct remote_endpoint_info *info = NULL;
-	void *data, *data_end;
-	struct iphdr *ip4;
-	__u32 srcid = 0;
-
-	if (!revalidate_data(ctx, &data, &data_end, &ip4))
-		return DROP_INVALID;
-
-	info = lookup_ip4_remote_endpoint(ip4->saddr);
-	if (info != NULL)
-		srcid = info->sec_label;
-	cilium_dbg(ctx, info ? DBG_IP_ID_MAP_SUCCEED4 : DBG_IP_ID_MAP_FAILED4,
-		   ip4->saddr, srcid);
-
-	return srcid;
-}
-# endif /* ENABLE_HOST_FIREWALL */
-
 static __always_inline __u32
 resolve_srcid_ipv4(struct __ctx_buff *ctx, __u32 srcid_from_proxy,
 		   const bool from_host)
@@ -935,7 +913,9 @@ int to_netdev(struct __ctx_buff *ctx __maybe_unused)
 		/* to-netdev is attached to the egress path of the native
 		 * device.
 		 */
-		srcID = ipcache_lookup_srcid4(ctx);
+		if ((ctx->mark & MARK_MAGIC_HOST_MASK) == MARK_MAGIC_HOST)
+			srcID = HOST_ID;
+		srcID = resolve_srcid_ipv4(ctx, srcID, true);
 		ret = ipv4_host_policy_egress(ctx, srcID);
 		break;
 # endif
