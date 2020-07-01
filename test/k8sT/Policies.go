@@ -1005,6 +1005,14 @@ var _ = Describe("K8sPolicyTest", func() {
 				} else {
 					ExpectWithOffset(1, err).ToNot(BeNil(), "traffic was redirected to the proxy when it should have not been redirected")
 				}
+
+				if parser == policy.ParserTypeDNS {
+					// Tests Hubble name association and filtering when proxying DNS
+					res := kubectl.HubbleObserve(helpers.CiliumNamespace, ciliumPod,
+						fmt.Sprintf("--last 1 --from-pod %s/%s --to-fqdn %q",
+							namespaceForTest, appPods[helpers.App2], "*.cilium.io"))
+					res.ExpectContainsFilterLine("{.destination_names[0]}", "vagrant-cache.ci.cilium.io")
+				}
 			}
 
 			proxyVisibilityTest := func(resource, podToAnnotate, anno string, parserType policy.L7ParserType, retryCurl bool) {
